@@ -29,12 +29,15 @@ int main()
       res[i] = i + 2*i;
    }
 
-   // add two vectors
+   // add two vectors, need tofrom for c to allocate mem on device
+#pragma omp target map(to: a[0:N], b[0:N]) map(tofrom:c[0:N])
+#pragma omp loop
    for (int i=0; i<N; i++){
       c[i] = a[i] + b[i];
    }
 
    // test results
+#pragma omp parallel for reduction(+:err)
    for(int i=0;i<N;i++){
       float val = c[i] - res[i];
       val = val*val;

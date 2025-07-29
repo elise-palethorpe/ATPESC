@@ -128,8 +128,13 @@ int main(int argc, char *argv[]) {
   // Run through timesteps under the explicit scheme
   //
 
+//GPU startup overhead that we don't want timed
+#pragma omp target
+  {}
   // Start the solve timer
+  //
   double tic = omp_get_wtime();
+#pragma omp target enter data map(to : u[0:n*n], u_tmp[0:n*n])
   for (int t = 0; t < nsteps; ++t) {
 
     // Call the solve kernel
@@ -142,6 +147,7 @@ int main(int argc, char *argv[]) {
     u = u_tmp;
     u_tmp = tmp;
   }
+#pragma omp target exit data map(from:u[0:n*n])
   // Stop solve timer
   double toc = omp_get_wtime();
 
@@ -204,9 +210,12 @@ void solve(const int n, const double alpha, const double dx, const double dt, co
   const double r2 = 1.0 - 4.0*r;
 
   // Loop over the nxn grid
+/*#define ALT*/
 #ifdef ALT
-  for (int i = 1; i < n-1; ++i) {
-    for (int j = 1; j < n-1; ++j) {
+
+#pragma omp parallel for collapse(2)
+  for (int j = 1; j < n-1; ++j) {
+    for (int i = 1; i < n-1; ++i) {
 
       // Update the 5-point stencil, using boundary conditions on the edges of the domain.
       // Boundaries are zero because the MMS solution is zero there.
@@ -225,8 +234,10 @@ void solve(const int n, const double alpha, const double dx, const double dt, co
 //  }
 
 #else
-  for (int i = 0; i < n; ++i) {
-    for (int j = 0; j < n; ++j) {
+#pragma omp target
+#pragma omp loop
+  for (int j = 0; j < n; ++j) {
+    for (int i = 0; i < n; ++i) {
 
       // Update the 5-point stencil, using boundary conditions on the edges of the domain.
       // Boundaries are zero because the MMS solution is zero there.
