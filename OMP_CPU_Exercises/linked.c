@@ -90,10 +90,57 @@ int main(int argc, char *argv[]) {
 
    // traverse the list process work for each node
    start = omp_get_wtime();
-   while (p != NULL) {
+
+#define TASKS
+#ifdef TASKS
+#pragma omp parallel
+{
+#pragma omp single
+  {
+    while (p != NULL) {
+#pragma omp task firstprivate(p)
       processwork(p);
       p = p->next;
-   }
+    }
+  }
+}
+#endif
+
+#ifndef TASKS
+#define OPT1
+#ifdef OPT1
+#pragma omp parallel firstprivate(p)
+{
+  int thread_id = omp_get_thread_num();
+  int nthreads = omp_get_num_threads();
+  int i = 0;
+
+  while (p != NULL) {
+    if (i % nthreads == thread_id) {
+      processwork(p);
+    }
+    p = p->next;
+    i++;
+  }
+}
+#endif
+
+#ifndef OPT1
+#pragma omp parallel
+{
+  struct node *thread_p;
+  while (p != NULL) {
+#pragma omp critical
+    {
+      thread_p = p;
+      if (p != NULL) p = p->next;
+    }
+    if (thread_p != NULL) processwork(thread_p);
+  }
+}
+#endif
+#endif
+
    end = omp_get_wtime();
 
    // traverse the list releasing memory allocated for the list
